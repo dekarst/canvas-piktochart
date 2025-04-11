@@ -27,6 +27,7 @@ const fileFilter = (req: Express.Request, file: Express.Multer.File, cb: any) =>
 const uploadMiddleware = multer({ storage, fileFilter }).single('upload')
 
 server.use(express.static('./'))
+    .use('/images', express.static(__dirname + '/images'))
     .post('/uploads', (req, res) => {
         uploadMiddleware(req, res, err => {
             if (err || !req.file) {

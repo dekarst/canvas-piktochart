@@ -28,23 +28,169 @@
           <hr>
           <div class="text">
             <h4>Text</h4>
-            <input id="addTextInput" type="text" class="form-control">
-            <button id="addText" class="btn btn-info btn-block mt-2">Add Text</button>
+            <input id="add-text-input" type="text" class="form-control">
+            <button id="add-text" class="btn btn-info btn-block mt-2">Add Text</button>
           </div>
-          <div class="image">
+          <div class="image mt-3">
             <h4>Images</h4>
-            <ul class="list-unstyled">
+            <ul class="list-unstyled" id="image-list">
               <!-- List of images here -->
             </ul>
           </div>
         </div>
       </div>
       <div class="canvas col-10">
-        <div class="block mx-auto mt-3">
+        <div class="block mx-auto mt-3" id="canvas-block">
           <!-- Add images and texts to here -->
         </div>
       </div>
     </div>
   </div>
+
+  <script>
+    const imageList = document.getElementById('image-list');
+    const canvasBlock = document.getElementById('canvas-block');
+    const uploadInput = document.getElementById('upload-image-input');
+    const uploadBtn = document.getElementById('upload-image');
+    const addTextInput = document.getElementById('add-text-input');
+    const addTextBtn = document.getElementById('add-text');
+
+    const saveState = () => {
+      const items = [];
+      canvasBlock.querySelectorAll('.canvas-item').forEach(el => {
+        items.push({
+          type: el.dataset.type,
+          content: el.dataset.content,
+          x: el.style.left,
+          y: el.style.top
+        });
+      });
+      localStorage.setItem('canvasState', JSON.stringify(items));
+    };
+
+    const loadState = () => {
+      const items = JSON.parse(localStorage.getItem('canvasState') || '[]');
+      items.forEach(item => {
+        if (item.type === 'text') {
+          addTextToCanvas(item.content, item.x, item.y);
+        } else {
+          addImageToCanvas(item.content, item.x, item.y);
+        }
+      });
+    };
+
+    const makeDraggable = (el) => {
+      let offsetX, offsetY, isDragging = false;
+      el.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        offsetX = e.offsetX;
+        offsetY = e.offsetY;
+      });
+      document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        el.style.left = (e.pageX - canvasBlock.offsetLeft - offsetX) + 'px';
+        el.style.top = (e.pageY - canvasBlock.offsetTop - offsetY) + 'px';
+      });
+      document.addEventListener('mouseup', () => {
+        if (isDragging) {
+          isDragging = false;
+          saveState();
+        }
+      });
+    };
+
+    const addTextToCanvas = (text, x = '100px', y = '100px') => {
+      const div = document.createElement('div');
+      div.className = 'canvas-item';
+      div.textContent = text;
+      div.style.left = x;
+      div.style.top = y;
+      div.dataset.type = 'text';
+      div.dataset.content = text;
+
+      const deleteBtn = document.createElement('div');
+      deleteBtn.className = 'delete-btn';
+      deleteBtn.innerText = '×';
+      deleteBtn.onclick = () => {
+        div.remove();
+        saveState();
+      };
+
+      div.appendChild(deleteBtn);
+      canvasBlock.appendChild(div);
+      makeDraggable(div);
+      saveState();
+    };
+
+    const addImageToCanvas = (src, x = '100px', y = '100px') => {
+      const div = document.createElement('div');
+      div.className = 'canvas-item';
+      div.style.left = x;
+      div.style.top = y;
+      div.dataset.type = 'image';
+      div.dataset.content = src;
+
+      const img = document.createElement('img');
+      img.src = src;
+      img.style.maxWidth = '150px';
+
+      const deleteBtn = document.createElement('div');
+      deleteBtn.className = 'delete-btn';
+      deleteBtn.innerText = '×';
+      deleteBtn.onclick = () => {
+        div.remove();
+        saveState();
+      };
+
+      div.appendChild(deleteBtn);
+      div.appendChild(img);
+      canvasBlock.appendChild(div);
+      makeDraggable(div);
+      saveState();
+    };
+
+    const loadImages = async () => {
+      const res = await fetch('/images');
+      const images = await res.json();
+      imageList.innerHTML = '';
+      images.forEach(src => {
+        const li = document.createElement('li');
+        const img = document.createElement('img');
+        img.src = src;
+        img.style.maxWidth = '100%';
+        img.style.cursor = 'pointer';
+        img.onclick = () => addImageToCanvas(src);
+        li.appendChild(img);
+        imageList.appendChild(li);
+      });
+    };
+
+    uploadBtn.onclick = async () => {
+      const file = uploadInput.files[0];
+      if (!file) return;
+      const formData = new FormData();
+      formData.append('upload', file);
+      const res = await fetch('/uploads', { method: 'POST', body: formData });
+      if (res.ok) {
+        await loadImages();
+        uploadInput.value = '';
+      } else {
+        alert('Upload failed');
+      }
+    };
+
+    addTextBtn.onclick = () => {
+      const text = addTextInput.value.trim();
+      if (text) {
+        addTextToCanvas(text);
+        addTextInput.value = '';
+      }
+    };
+
+    window.onload = () => {
+      loadImages();
+      loadState();
+    };
+  </script>
 </body>
 </html>
